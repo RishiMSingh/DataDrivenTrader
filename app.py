@@ -14,6 +14,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 from LinearRegression import LinearRegression
 from arima_model import ARIMAModel
 import numpy as np
+import pandas as pd
 
 # Example usage
 stock = StockData('AAPL', '2000-01-01', '2023-01-01')
@@ -65,29 +66,54 @@ idx_count = 0
 results = []
 arima_results = []
 
+#Linear Regression Model
 for train_df, test_df in splitter.split():
-    print(train_df.columns)
+    
+    idx_count += 1
+    # Splitting the training and testing data
+    X_train, y_train = train_df.drop(label_column, axis=1), train_df[label_column]
+    X_test, y_test = test_df.drop(label_column, axis=1), test_df[label_column]
+    
+    
+    # Create and train the linear regression model
+    lr_model = LinearRegression(learning_rate=0.0001, n_iterations=500)
+    lr_model.fit(X_train, y_train)
+    
+    # Evaluate the model on the test set
+    lr_model.evaluate(X_test, y_test)
 
+# Load and clean your data
+stock = StockData('AAPL', '2000-01-01', '2023-01-01')
+stock.fetch_data()
+stock.clean_data()
+data = stock.get_data()
 
+# Set the frequency of the date index
+#data.index = pd.DatetimeIndex(data.index).to_period('D')
 
-# for train_df, test_df in splitter.split():
-#     idx_count += 1
-#     # Splitting the training and testing data
-#     X_train, y_train = train_df.drop(label_column, axis=1), train_df[label_column]
-#     X_test, y_test = test_df.drop(label_column, axis=1), test_df[label_column]
-    
-    
-#     # Create and train the linear regression model
-#     lr_model = LinearRegression(learning_rate=0.0001, n_iterations=500)
-#     lr_model.fit(X_train, y_train)
-    
-#     # Evaluate the model on the test set
-#     lr_model.evaluate(X_test, y_test)
-    
-    
-#     # Initialize and train the ARIMA model
-#     arima_model = ARIMAModel(order=(1, 1, 1))
-#     arima_model.fit(train_df['Close'])
-#     arima_forecast = arima_model.forecast(steps=len(test_df))
-#     arima_results.append(arima_model.evaluate(test_df['Close'], arima_forecast))
+# Prepare your rolling window splitter
+splitter = RollingWindowSplitter(data)
 
+# Initialize a list to store ARIMA results
+arima_results = []
+
+for train_df, test_df in splitter.split():
+    # Set the frequency of the date index
+    train_df.index = pd.DatetimeIndex(data.index).to_period('D')
+    test_df.index = pd.DatetimeIndex(data.index).to_period('D')
+    
+    # Fit the ARIMA model on the training set
+    arima_model = ARIMAModel(order=(1, 1, 1))
+    arima_model.fit(train_df['Close'])
+
+    # Forecast the length of the test set
+    forecast_length = len(test_df)
+    forecast = arima_model.forecast(steps=forecast_length)
+
+    # Evaluate the model
+    eval_result = arima_model.evaluate(test_df['Close'], forecast)
+    arima_results.append(eval_result)
+
+# Output the results
+for result in arima_results:
+    print(result)
